@@ -18,11 +18,11 @@ from scripts.utils import (
 def start_databases() -> bool:
     """Start database services (PostgreSQL and Redis)."""
     print_status("Starting database services...")
-    
+
     if not check_docker():
         print_warning("Docker not available. Please start PostgreSQL and Redis manually.")
         return False
-    
+
     # Start PostgreSQL
     try:
         # Check if PostgreSQL container is already running
@@ -48,7 +48,7 @@ def start_databases() -> bool:
     except subprocess.CalledProcessError as e:
         print_error(f"Failed to start PostgreSQL: {e}")
         return False
-    
+
     # Start Redis
     try:
         # Check if Redis container is already running
@@ -71,21 +71,21 @@ def start_databases() -> bool:
     except subprocess.CalledProcessError as e:
         print_error(f"Failed to start Redis: {e}")
         return False
-    
+
     return True
 
 
 def init_database() -> bool:
     """Initialize database schema."""
     print_status("Initializing database...")
-    
+
     project_root = get_project_root()
     backend_dir = os.path.join(project_root, "backend")
-    
+
     if not os.path.exists(backend_dir):
         print_error(f"Backend directory not found: {backend_dir}")
         return False
-    
+
     # Wait for PostgreSQL to be ready
     if check_docker():
         print_status("Waiting for PostgreSQL to be ready...")
@@ -101,7 +101,7 @@ def init_database() -> bool:
                 if retries >= max_retries:
                     print_error("PostgreSQL did not become ready in time")
                     return False
-    
+
     # Run database initialization
     try:
         # Create a Python script to initialize the database
@@ -110,18 +110,18 @@ from app.core.database import init_db
 init_db()
 print('Database initialized successfully')
         """
-        
+
         # Write the script to a temporary file
         temp_script = os.path.join(backend_dir, "init_db_temp.py")
         with open(temp_script, 'w') as f:
             f.write(init_script)
-        
-        # Run the script
-        run_command(["python", "init_db_temp.py"], cwd=backend_dir)
-        
+
+        # Run the script within the conda environment
+        run_command(["python", "init_db_temp.py"], cwd=backend_dir, use_conda=True)
+
         # Clean up
         os.remove(temp_script)
-        
+
         print_success("Database initialized")
         return True
     except (subprocess.CalledProcessError, IOError) as e:
@@ -132,11 +132,11 @@ print('Database initialized successfully')
 def stop_databases() -> bool:
     """Stop database services."""
     print_status("Stopping database services...")
-    
+
     if not check_docker():
         print_warning("Docker not available. Please stop PostgreSQL and Redis manually.")
         return False
-    
+
     try:
         # Stop PostgreSQL and Redis containers
         run_command(["docker", "stop", "supermon-postgres", "supermon-redis"])

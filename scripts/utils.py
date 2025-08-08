@@ -58,8 +58,10 @@ def print_error(message: str) -> None:
     logger.error(f"{COLORS['RED']}[ERROR]{COLORS['NC']} {message}")
 
 
-def run_command(cmd: List[str], cwd: Optional[str] = None) -> subprocess.CompletedProcess:
+def run_command(cmd: List[str], cwd: Optional[str] = None, use_conda: bool = False) -> subprocess.CompletedProcess:
     """Run a command and return the result."""
+    if use_conda:
+        cmd = ["conda", "run", "-n", "supermon"] + cmd
     try:
         result = subprocess.run(
             cmd,
@@ -75,8 +77,10 @@ def run_command(cmd: List[str], cwd: Optional[str] = None) -> subprocess.Complet
         raise
 
 
-def run_background_process(cmd: List[str], cwd: Optional[str] = None, pid_file: Optional[str] = None) -> int:
+def run_background_process(cmd: List[str], cwd: Optional[str] = None, pid_file: Optional[str] = None, use_conda: bool = False) -> int:
     """Run a command in the background and optionally save its PID to a file."""
+    if use_conda:
+        cmd = ["conda", "run", "-n", "supermon"] + cmd
     process = subprocess.Popen(
         cmd,
         cwd=cwd,
@@ -85,7 +89,7 @@ def run_background_process(cmd: List[str], cwd: Optional[str] = None, pid_file: 
         text=True,
         preexec_fn=os.setsid
     )
-    
+
     # Save PID to file if requested
     if pid_file:
         try:
@@ -93,7 +97,7 @@ def run_background_process(cmd: List[str], cwd: Optional[str] = None, pid_file: 
                 f.write(str(process.pid))
                 f.flush()
                 os.fsync(f.fileno())  # Ensure it's written to disk
-            
+
             # Verify the PID was written correctly
             with open(pid_file, 'r') as f:
                 content = f.read().strip()
@@ -101,7 +105,7 @@ def run_background_process(cmd: List[str], cwd: Optional[str] = None, pid_file: 
                     print_error(f"Failed to write PID to file: {pid_file}")
         except Exception as e:
             print_error(f"Error writing PID file: {e}")
-    
+
     return process.pid
 
 
@@ -109,7 +113,7 @@ def check_process_running(pid_file: str) -> bool:
     """Check if a process is running based on its PID file."""
     if not os.path.exists(pid_file):
         return False
-    
+
     try:
         with open(pid_file, 'r') as f:
             content = f.read().strip()
@@ -117,7 +121,7 @@ def check_process_running(pid_file: str) -> bool:
                 print_warning(f"PID file exists but is empty: {pid_file}")
                 return False
             pid = int(content)
-        
+
         # Check if process is running
         is_running = False
         if HAS_PSUTIL:
@@ -130,10 +134,10 @@ def check_process_running(pid_file: str) -> bool:
                 is_running = True
             except OSError:
                 is_running = False
-        
+
         if not is_running:
             print_warning(f"Process with PID {pid} from {pid_file} is not running")
-        
+
         return is_running
     except (ValueError, IOError) as e:
         print_warning(f"Error checking PID file {pid_file}: {e}")
@@ -144,17 +148,17 @@ def stop_process(pid_file: str) -> bool:
     """Stop a process based on its PID file."""
     if not os.path.exists(pid_file):
         return True
-    
+
     try:
         with open(pid_file, 'r') as f:
             pid = int(f.read().strip())
-        
+
         # Try to terminate the process group
         try:
             os.killpg(os.getpgid(pid), signal.SIGTERM)
             # Give it a moment to terminate gracefully
             time.sleep(2)
-            
+
             # If still running, force kill
             is_running = False
             if HAS_PSUTIL:
@@ -165,13 +169,13 @@ def stop_process(pid_file: str) -> bool:
                     is_running = True
                 except OSError:
                     is_running = False
-            
+
             if is_running:
                 os.killpg(os.getpgid(pid), signal.SIGKILL)
         except ProcessLookupError:
             # Process already gone
             pass
-        
+
         # Remove PID file
         os.remove(pid_file)
         return True
@@ -207,17 +211,17 @@ def get_project_root() -> str:
 def load_env_file(env_file: str) -> Dict[str, str]:
     """Load environment variables from a .env file."""
     env_vars = {}
-    
+
     if not os.path.exists(env_file):
         return env_vars
-    
+
     with open(env_file, 'r') as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
-            
+
             key, value = line.split('=', 1)
             env_vars[key.strip()] = value.strip()
-    
+
     return env_vars

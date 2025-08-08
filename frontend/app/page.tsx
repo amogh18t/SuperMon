@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { useQuery } from 'react-query';
-import { 
-  ChartBarIcon, 
-  FolderIcon, 
-  UserGroupIcon, 
+import {
+  ChartBarIcon,
+  FolderIcon,
+  UserGroupIcon,
   CalendarIcon,
   CogIcon,
   RocketLaunchIcon,
@@ -23,12 +23,12 @@ import { AgentStatus } from '@/components/dashboard/AgentStatus';
 import { MCPStatus } from '@/components/dashboard/MCPStatus';
 
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery('dashboard-stats', 
+  const { data: stats, isLoading: statsLoading } = useQuery('dashboard-stats',
     () => api.get('/projects/status').then(res => res.data),
     { refetchInterval: 30000 }
   );
 
-  const { data: projects, isLoading: projectsLoading } = useQuery('projects', 
+  const { data: projects, isLoading: projectsLoading } = useQuery('projects',
     () => api.get('/projects').then(res => res.data),
     { refetchInterval: 60000 }
   );
@@ -74,7 +74,7 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
@@ -88,7 +88,7 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Stats Grid */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -133,7 +133,7 @@ export default function Dashboard() {
           {/* Left Column - Projects and Activity */}
           <div className="lg:col-span-2 space-y-8">
             {/* Projects */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
@@ -149,7 +149,7 @@ export default function Dashboard() {
             </motion.div>
 
             {/* Recent Activity */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
@@ -162,7 +162,7 @@ export default function Dashboard() {
           {/* Right Column - Status and Quick Actions */}
           <div className="space-y-8">
             {/* Agent Status */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
@@ -172,7 +172,7 @@ export default function Dashboard() {
             </motion.div>
 
             {/* MCP Connections */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
@@ -182,7 +182,7 @@ export default function Dashboard() {
             </motion.div>
 
             {/* Quick Actions */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
@@ -209,4 +209,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-} 
+}

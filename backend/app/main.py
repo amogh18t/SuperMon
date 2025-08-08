@@ -18,19 +18,19 @@ Base.metadata.create_all(bind=engine)
 async def lifespan(app: FastAPI):
     # Startup
     print("🚀 Starting SuperMon SDLC Automation Platform...")
-    
+
     # Initialize MCP Manager
     app.state.mcp_manager = MCPManager()
     await app.state.mcp_manager.initialize()
-    
+
     # Initialize Agent Manager
     app.state.agent_manager = AgentManager()
     await app.state.agent_manager.initialize()
-    
+
     print("✅ SuperMon platform initialized successfully!")
-    
+
     yield
-    
+
     # Shutdown
     print("🛑 Shutting down SuperMon platform...")
     await app.state.mcp_manager.cleanup()
@@ -79,4 +79,4 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True
-    ) 
+    )
