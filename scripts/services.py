@@ -12,7 +12,8 @@ from typing import Dict, List, Optional, Tuple
 from scripts.utils import (
     print_status, print_success, print_warning, print_error,
     run_command, run_background_process, check_process_running,
-    stop_process, get_project_root, check_docker
+    stop_process, get_project_root, get_run_dir, get_data_dir,
+    check_docker, COLORS
 )
 
 
@@ -22,7 +23,7 @@ def start_backend() -> bool:
 
     project_root = get_project_root()
     backend_dir = os.path.join(project_root, "backend")
-    pid_file = os.path.join(project_root, "backend.pid")
+    pid_file = os.path.join(get_run_dir(), "backend.pid")
 
     if not os.path.exists(backend_dir):
         print_error(f"Backend directory not found: {backend_dir}")
@@ -45,13 +46,23 @@ def start_backend() -> bool:
         return False
 
 
+
+def _get_service_pid_file(name: str) -> str:
+    """Get the active PID file for a service, checking .run/ first then root for legacy PIDs."""
+    run_pid = os.path.join(get_run_dir(), f"{name}.pid")
+    root_pid = os.path.join(get_project_root(), f"{name}.pid")
+    if os.path.exists(root_pid) and not os.path.exists(run_pid):
+        return root_pid
+    return run_pid
+
+
 def start_frontend() -> bool:
     """Start the frontend server."""
     print_status("Starting frontend server...")
 
     project_root = get_project_root()
     frontend_dir = os.path.join(project_root, "frontend")
-    pid_file = os.path.join(project_root, "frontend.pid")
+    pid_file = os.path.join(get_run_dir(), "frontend.pid")
 
     if not os.path.exists(frontend_dir):
         print_error(f"Frontend directory not found: {frontend_dir}")
@@ -90,13 +101,15 @@ def start_mcp_servers() -> bool:
         ("slack_mcp", "slack_mcp.py"),
         ("whatsapp_mcp", "whatsapp_mcp.py"),
         ("notion_mcp", "notion_mcp.py"),
-        ("github_mcp", "github_mcp.py")
+        ("github_mcp", "github_mcp.py"),
+        ("postgresql_mcp", "postgresql_mcp.py"),
+        ("redis_mcp", "redis_mcp.py")
     ]
 
     success = True
     for mcp_name, mcp_script in mcp_servers:
         mcp_path = os.path.join(mcp_dir, mcp_name, mcp_script)
-        pid_file = os.path.join(project_root, f"{mcp_name}.pid")
+        pid_file = os.path.join(get_run_dir(), f"{mcp_name}.pid")
 
         # Check if MCP server exists
         if not os.path.exists(mcp_path):
@@ -125,9 +138,7 @@ def start_mcp_servers() -> bool:
 def stop_backend() -> bool:
     """Stop the backend server."""
     print_status("Stopping backend server...")
-
-    project_root = get_project_root()
-    pid_file = os.path.join(project_root, "backend.pid")
+    pid_file = _get_service_pid_file("backend")
 
     if stop_process(pid_file):
         print_success("Backend server stopped")
@@ -140,9 +151,7 @@ def stop_backend() -> bool:
 def stop_frontend() -> bool:
     """Stop the frontend server."""
     print_status("Stopping frontend server...")
-
-    project_root = get_project_root()
-    pid_file = os.path.join(project_root, "frontend.pid")
+    pid_file = _get_service_pid_file("frontend")
 
     if stop_process(pid_file):
         print_success("Frontend server stopped")
@@ -155,18 +164,14 @@ def stop_frontend() -> bool:
 def stop_mcp_servers() -> bool:
     """Stop all MCP servers."""
     print_status("Stopping MCP servers...")
-
-    project_root = get_project_root()
-    mcp_servers = ["slack_mcp", "whatsapp_mcp", "notion_mcp", "github_mcp"]
+    mcp_servers = ["slack_mcp", "whatsapp_mcp", "notion_mcp", "github_mcp", "postgresql_mcp", "redis_mcp"]
 
     success = True
     for mcp_name in mcp_servers:
-        pid_file = os.path.join(project_root, f"{mcp_name}.pid")
-
+        pid_file = _get_service_pid_file(mcp_name)
         if stop_process(pid_file):
             print_success(f"{mcp_name} stopped")
         else:
-            print_warning(f"Failed to stop {mcp_name} or not running")
             success = False
 
     return success
@@ -187,57 +192,55 @@ def show_status() -> None:
     """Show the status of all services."""
     print_status("Checking service status...")
 
-    project_root = get_project_root()
-
     print("")
     print("📊 Service Status:")
     print("==================")
 
+    G = COLORS["GREEN"]
+    R = COLORS["RED"]
+    Y = COLORS["YELLOW"]
+    NC = COLORS["NC"]
+
     # Backend
-    backend_pid_file = os.path.join(project_root, "backend.pid")
-    if check_process_running(backend_pid_file):
-        print(f"{os.environ.get('GREEN', '')}✓{os.environ.get('NC', '')} Backend (http://localhost:8000)")
+    backend_pid = _get_service_pid_file("backend")
+    if check_process_running(backend_pid):
+        print(f"{G}✓{NC} Backend (http://localhost:8000)")
     else:
-        print(f"{os.environ.get('RED', '')}✗{os.environ.get('NC', '')} Backend")
+        print(f"{R}✗{NC} Backend")
 
     # Frontend
-    frontend_pid_file = os.path.join(project_root, "frontend.pid")
-    if check_process_running(frontend_pid_file):
-        print(f"{os.environ.get('GREEN', '')}✓{os.environ.get('NC', '')} Frontend (http://localhost:3000)")
+    frontend_pid = _get_service_pid_file("frontend")
+    if check_process_running(frontend_pid):
+        print(f"{G}✓{NC} Frontend (http://localhost:3000)")
     else:
-        print(f"{os.environ.get('RED', '')}✗{os.environ.get('NC', '')} Frontend")
+        print(f"{R}✗{NC} Frontend")
 
     # MCP Servers
     mcp_servers = [
         ("slack_mcp", "Slack MCP"),
         ("whatsapp_mcp", "WhatsApp MCP"),
         ("notion_mcp", "Notion MCP"),
-        ("github_mcp", "GitHub MCP")
+        ("github_mcp", "GitHub MCP"),
+        ("postgresql_mcp", "PostgreSQL MCP"),
+        ("redis_mcp", "Redis MCP")
     ]
 
     for mcp_file, mcp_display in mcp_servers:
-        pid_file = os.path.join(project_root, f"{mcp_file}.pid")
+        pid_file = _get_service_pid_file(mcp_file)
         if check_process_running(pid_file):
-            print(f"{os.environ.get('GREEN', '')}✓{os.environ.get('NC', '')} {mcp_display}")
+            print(f"{G}✓{NC} {mcp_display}")
         else:
-            print(f"{os.environ.get('RED', '')}✗{os.environ.get('NC', '')} {mcp_display}")
+            print(f"{R}✗{NC} {mcp_display}")
 
-    # Databases
-    if check_docker():
-        try:
-            result = run_command(["docker", "ps", "--filter", "name=supermon-postgres", "--format", "{{.Names}}"])
-            if "supermon-postgres" in result.stdout:
-                print(f"{os.environ.get('GREEN', '')}✓{os.environ.get('NC', '')} PostgreSQL")
-            else:
-                print(f"{os.environ.get('RED', '')}✗{os.environ.get('NC', '')} PostgreSQL")
+    # Database: check in data/ first, then fallbacks
+    data_db = os.path.join(get_data_dir(), "supermon.db")
+    app_db = os.path.join(get_project_root(), "backend", "app", "supermon.db")
+    root_db = os.path.join(get_project_root(), "supermon.db")
 
-            result = run_command(["docker", "ps", "--filter", "name=supermon-redis", "--format", "{{.Names}}"])
-            if "supermon-redis" in result.stdout:
-                print(f"{os.environ.get('GREEN', '')}✓{os.environ.get('NC', '')} Redis")
-            else:
-                print(f"{os.environ.get('RED', '')}✗{os.environ.get('NC', '')} Redis")
-        except subprocess.CalledProcessError:
-            print(f"{os.environ.get('RED', '')}✗{os.environ.get('NC', '')} Database status check failed")
+    if os.path.exists(data_db) or os.path.exists(app_db) or os.path.exists(root_db):
+        print(f"{G}✓{NC} SQLite Database (active)")
+    else:
+        print(f"{Y}○{NC} SQLite Database (ready)")
 
     print("")
     print("🌐 Access Points:")

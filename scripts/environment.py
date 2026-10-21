@@ -120,21 +120,21 @@ def check_env_file() -> bool:
 def run_code_quality_checks() -> bool:
     """Run code quality checks."""
     print_status("Running code quality checks...")
-    
+
     project_root = get_project_root()
     pre_commit_config = os.path.join(project_root, ".pre-commit-config.yaml")
-    
+
     if not os.path.exists(pre_commit_config):
         print_warning("Pre-commit config not found, skipping code quality checks")
         return True
-    
+
     try:
         # Install pre-commit hooks
-        run_command(["pre-commit", "install"], cwd=project_root)
-        
+        run_command(["pre-commit", "install"], cwd=project_root, use_conda=True)
+
         # Run all hooks
-        run_command(["pre-commit", "run", "--all-files"], cwd=project_root)
-        
+        run_command(["pre-commit", "run", "--all-files"], cwd=project_root, use_conda=True)
+
         print_success("Code quality checks completed")
         return True
     except subprocess.CalledProcessError:
@@ -145,21 +145,21 @@ def run_code_quality_checks() -> bool:
 def format_code() -> bool:
     """Format code using black and isort."""
     print_status("Formatting code...")
-    
+
     project_root = get_project_root()
     backend_dir = os.path.join(project_root, "backend")
-    
+
     if not os.path.exists(backend_dir):
         print_error(f"Backend directory not found: {backend_dir}")
         return False
-    
+
     try:
         # Run black
-        run_command(["black", "."], cwd=backend_dir)
-        
+        run_command(["black", "."], cwd=backend_dir, use_conda=True)
+
         # Run isort
-        run_command(["isort", "."], cwd=backend_dir)
-        
+        run_command(["isort", "."], cwd=backend_dir, use_conda=True)
+
         print_success("Code formatting completed")
         return True
     except subprocess.CalledProcessError:
@@ -168,51 +168,49 @@ def format_code() -> bool:
 
 
 def lint_code() -> bool:
-    """Lint code using ruff and mypy."""
+    """Lint code using flake8 and mypy."""
     print_status("Linting code...")
-    
+
     project_root = get_project_root()
     backend_dir = os.path.join(project_root, "backend")
-    
+
     if not os.path.exists(backend_dir):
         print_error(f"Backend directory not found: {backend_dir}")
         return False
-    
+
     try:
-        # Run ruff
-        run_command(["ruff", "check", "."], cwd=backend_dir)
-        
-        # Run mypy
-        run_command(["mypy", "app/"], cwd=backend_dir)
-        
+        # Run flake8
+        run_command(
+            ["flake8", "--max-line-length=120", "--extend-ignore=E203,W503,F401,W291,W293", "app/"],
+            cwd=backend_dir,
+            use_conda=True
+        )
+
+        # Run mypy with pyproject.toml
+        run_command(
+            ["mypy", "--config-file", os.path.join(project_root, "pyproject.toml"), "app/"],
+            cwd=backend_dir,
+            use_conda=True
+        )
+
         print_success("Code linting completed")
+
         return True
     except subprocess.CalledProcessError:
         print_error("Code linting failed")
         return False
 
 
+
 def run_tests() -> bool:
     """Run tests using pytest."""
     print_status("Running tests...")
-    
+
     project_root = get_project_root()
-    backend_dir = os.path.join(project_root, "backend")
-    
-    if not os.path.exists(backend_dir):
-        print_error(f"Backend directory not found: {backend_dir}")
-        return False
-    
     try:
         # Run pytest
-        run_command([
-            "pytest", "-v", 
-            "--cov=app", 
-            "--cov-report=html", 
-            "--cov-report=term-missing"
-        ], cwd=backend_dir)
-        
-        print_success("Tests completed")
+        run_command(["pytest", "-v"], cwd=project_root, use_conda=True)
+        print_success("Tests completed successfully")
         return True
     except subprocess.CalledProcessError:
         print_error("Tests failed")

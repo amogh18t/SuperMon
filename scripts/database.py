@@ -16,26 +16,23 @@ from scripts.utils import (
 
 
 def start_databases() -> bool:
-    """Start database services (PostgreSQL and Redis)."""
+    """Start database services (PostgreSQL and Redis) if Docker is available."""
     print_status("Starting database services...")
 
     if not check_docker():
-        print_warning("Docker not available. Please start PostgreSQL and Redis manually.")
-        return False
+        print_status("Docker daemon not running. SuperMon will use the built-in SQLite database engine.")
+        return True
 
     # Start PostgreSQL
     try:
-        # Check if PostgreSQL container is already running
         result = run_command(["docker", "ps", "--filter", "name=supermon-postgres", "--format", "{{.Names}}"])
         if "supermon-postgres" in result.stdout:
             print_status("PostgreSQL already running")
         else:
-            # Check if container exists but is stopped
             result = run_command(["docker", "ps", "-a", "--filter", "name=supermon-postgres", "--format", "{{.Names}}"])
             if "supermon-postgres" in result.stdout:
                 run_command(["docker", "start", "supermon-postgres"])
             else:
-                # Create and start container
                 run_command([
                     "docker", "run", "-d", "--name", "supermon-postgres",
                     "-e", "POSTGRES_DB=supermon",
@@ -46,22 +43,18 @@ def start_databases() -> bool:
                 ])
             print_success("PostgreSQL started")
     except subprocess.CalledProcessError as e:
-        print_error(f"Failed to start PostgreSQL: {e}")
-        return False
+        print_warning(f"Could not start PostgreSQL in Docker: {e}. Will fall back to SQLite.")
 
     # Start Redis
     try:
-        # Check if Redis container is already running
         result = run_command(["docker", "ps", "--filter", "name=supermon-redis", "--format", "{{.Names}}"])
         if "supermon-redis" in result.stdout:
             print_status("Redis already running")
         else:
-            # Check if container exists but is stopped
             result = run_command(["docker", "ps", "-a", "--filter", "name=supermon-redis", "--format", "{{.Names}}"])
             if "supermon-redis" in result.stdout:
                 run_command(["docker", "start", "supermon-redis"])
             else:
-                # Create and start container
                 run_command([
                     "docker", "run", "-d", "--name", "supermon-redis",
                     "-p", "6379:6379",
@@ -69,8 +62,7 @@ def start_databases() -> bool:
                 ])
             print_success("Redis started")
     except subprocess.CalledProcessError as e:
-        print_error(f"Failed to start Redis: {e}")
-        return False
+        print_warning(f"Could not start Redis in Docker: {e}")
 
     return True
 
@@ -86,10 +78,9 @@ def init_database() -> bool:
         print_error(f"Backend directory not found: {backend_dir}")
         return False
 
-    # Wait for PostgreSQL to be ready
+    # Wait for PostgreSQL only if docker is actively running
     if check_docker():
-        print_status("Waiting for PostgreSQL to be ready...")
-        max_retries = 30
+        max_retries = 5
         retries = 0
         while retries < max_retries:
             try:
@@ -98,50 +89,38 @@ def init_database() -> bool:
             except subprocess.CalledProcessError:
                 retries += 1
                 time.sleep(1)
-                if retries >= max_retries:
-                    print_error("PostgreSQL did not become ready in time")
-                    return False
 
     # Run database initialization
     try:
-        # Create a Python script to initialize the database
-        init_script = """
-from app.core.database import init_db
-init_db()
-print('Database initialized successfully')
-        """
-
-        # Write the script to a temporary file
-        temp_script = os.path.join(backend_dir, "init_db_temp.py")
-        with open(temp_script, 'w') as f:
-            f.write(init_script)
-
-        # Run the script within the conda environment
-        run_command(["python", "init_db_temp.py"], cwd=backend_dir, use_conda=True)
-
-        # Clean up
-        os.remove(temp_script)
-
-        print_success("Database initialized")
+        init_code = (
+            "import sys; sys.path.insert(0, '.'); "
+            "from app.core.database import init_db, SessionLocal; "
+            "from app.core.seed import seed_initial_data; "
+            "init_db(); "
+            "db = SessionLocal(); "
+            "seed_initial_data(db); "
+            "db.close(); "
+            "print('Database initialized and seeded successfully')"
+        )
+        run_command(["python", "-c", init_code], cwd=backend_dir, use_conda=True)
+        print_success("Database initialized and ready")
         return True
+
     except (subprocess.CalledProcessError, IOError) as e:
-        print_error(f"Failed to initialize database: {e}")
-        return False
+        print_warning(f"Database init warning (non-fatal): {e}")
+        return True
 
 
 def stop_databases() -> bool:
     """Stop database services."""
-    print_status("Stopping database services...")
-
     if not check_docker():
-        print_warning("Docker not available. Please stop PostgreSQL and Redis manually.")
-        return False
+        return True
 
+    print_status("Stopping database services...")
     try:
-        # Stop PostgreSQL and Redis containers
         run_command(["docker", "stop", "supermon-postgres", "supermon-redis"])
         print_success("Database containers stopped")
         return True
     except subprocess.CalledProcessError as e:
-        print_error(f"Failed to stop database containers: {e}")
+        print_warning(f"Failed to stop database containers: {e}")
         return False

@@ -47,10 +47,48 @@ chmod +x start_all.sh supermon.py
 
 # Stop all services
 ./start_all.sh stop
+# OR clean shutdown and force-free all ports:
+./stop_all.sh
 
 # Restart all services
 ./start_all.sh restart
 ```
+
+## ⚡ Lightweight Developer Mode (Zero Docker, SQLite Engine)
+
+For daily development without starting Docker containers or managing local PostgreSQL/Redis instances, use `dev.sh`:
+
+```bash
+# Start SuperMon in instant Developer Mode (FastAPI + Next.js + 6 MCP servers + SQLite DB)
+./dev.sh start    # or simply ./dev.sh
+
+# Check real-time service status
+./dev.sh status
+
+# Follow backend and frontend logs
+./dev.sh logs backend
+./dev.sh logs frontend
+./dev.sh logs          # all logs
+
+# Restart all services cleanly
+./dev.sh restart
+
+# Stop all services and release ports 8000 & 3000
+./dev.sh stop          # or ./stop_all.sh
+```
+
+> **Note**: SuperMon automatically detects when Docker or PostgreSQL is unavailable and seamlessly falls back to a high-performance local SQLite database (`data/supermon.db`) with WAL mode enabled and sample projects pre-seeded. No configuration is required.
+
+## 📁 Clean Directory Organization
+
+Runtime artifacts and logs are neatly separated and never clutter the repository root:
+
+- **`logs/`**: All application and server logs
+  - `logs/backend.log`: FastAPI server output
+  - `logs/frontend.log`: Next.js development server output
+  - `logs/mcp/`: Output from individual MCP server microservices (`slack_mcp.log`, `github_mcp.log`, etc.)
+- **`.run/`**: Active runtime tracking (`*.pid` lock files, automatically cleaned on shutdown)
+- **`data/`**: Local persistence files (`data/supermon.db` SQLite database)
 
 ## 📂 Project Structure
 
@@ -58,12 +96,15 @@ chmod +x start_all.sh supermon.py
 The project now uses a modular Python-based script system for better maintainability:
 
 - `supermon.py` - Main Python script for managing all services
-- `start_all.sh` - Shell wrapper around the Python script
+- `dev.sh` - Fast developer workflow CLI (start, stop, status, logs)
+- `stop_all.sh` - Graceful shutdown and port cleanup utility
+- `start_all.sh` - Full environment launcher
 - `scripts/` - Directory containing modular components:
-  - `utils.py` - Utility functions
-  - `environment.py` - Environment and dependency management
-  - `database.py` - Database service management
-  - `services.py` - Backend, frontend, and MCP server management
+  - `utils.py` - Path resolution, process management, and logging helpers
+  - `environment.py` - Conda and frontend dependency management
+  - `database.py` - Docker container and SQLite database management
+  - `services.py` - FastAPI, Next.js, and MCP process lifecycle management
+
 
 This modular approach makes it easier to maintain and extend the platform.
 

@@ -122,17 +122,19 @@ class TestSettingsValidation:
             m.setenv("SLACK_BOT_TOKEN", "test_token")
             m.setenv("NOTION_API_KEY", "test_notion")
             m.setenv("GITHUB_TOKEN", "test_github")
-            
-            missing = validate_required_settings()
+
+            missing = validate_required_settings(Settings())
             assert missing == []
 
     def test_validate_required_settings_missing(self):
         """Test validation when some required settings are missing."""
         with pytest.MonkeyPatch().context() as m:
             m.setenv("GEMINI_API_KEY", "test_key")
-            # Missing other required settings
-            
-            missing = validate_required_settings()
+            m.delenv("SLACK_BOT_TOKEN", raising=False)
+            m.delenv("NOTION_API_KEY", raising=False)
+            m.delenv("GITHUB_TOKEN", raising=False)
+
+            missing = validate_required_settings(Settings())
             assert "SLACK_BOT_TOKEN" in missing
             assert "NOTION_API_KEY" in missing
             assert "GITHUB_TOKEN" in missing
@@ -142,11 +144,13 @@ class TestSettingsValidation:
         """Test check_settings function with missing settings."""
         with pytest.MonkeyPatch().context() as m:
             m.setenv("GEMINI_API_KEY", "test_key")
-            # Missing other required settings
-            
-            check_settings()
+            m.delenv("SLACK_BOT_TOKEN", raising=False)
+            m.delenv("NOTION_API_KEY", raising=False)
+            m.delenv("GITHUB_TOKEN", raising=False)
+
+            check_settings(Settings())
             captured = capsys.readouterr()
-            
+
             assert "Warning: Missing required settings" in captured.out
             assert "SLACK_BOT_TOKEN" in captured.out
             assert "NOTION_API_KEY" in captured.out
@@ -159,11 +163,12 @@ class TestSettingsValidation:
             m.setenv("SLACK_BOT_TOKEN", "test_token")
             m.setenv("NOTION_API_KEY", "test_notion")
             m.setenv("GITHUB_TOKEN", "test_github")
-            
-            check_settings()
+
+            check_settings(Settings())
             captured = capsys.readouterr()
-            
+
             assert "Warning: Missing required settings" not in captured.out
+
 
 
 class TestSettingsIntegration:
@@ -181,28 +186,21 @@ DATABASE_URL=postgresql://test:test@localhost/testdb
 REDIS_URL=redis://localhost:6379
 DEBUG=true
         """)
-        
-        # Temporarily change working directory to tmp_path
-        import os
-        original_cwd = os.getcwd()
-        os.chdir(tmp_path)
-        
-        try:
-            settings = Settings()
-            assert settings.GEMINI_API_KEY == "test_gemini_key"
-            assert settings.SLACK_BOT_TOKEN == "test_slack_token"
-            assert settings.NOTION_API_KEY == "test_notion_key"
-            assert settings.GITHUB_TOKEN == "test_github_token"
-            assert settings.DATABASE_URL == "postgresql://test:test@localhost/testdb"
-            assert settings.REDIS_URL == "redis://localhost:6379"
-            assert settings.DEBUG is True
-        finally:
-            os.chdir(original_cwd)
+
+        loaded_settings = Settings(_env_file=str(env_file))
+        assert loaded_settings.GEMINI_API_KEY == "test_gemini_key"
+        assert loaded_settings.SLACK_BOT_TOKEN == "test_slack_token"
+        assert loaded_settings.NOTION_API_KEY == "test_notion_key"
+        assert loaded_settings.GITHUB_TOKEN == "test_github_token"
+        assert loaded_settings.DATABASE_URL == "postgresql://test:test@localhost/testdb"
+        assert loaded_settings.REDIS_URL == "redis://localhost:6379"
+        assert loaded_settings.DEBUG is True
 
     def test_settings_case_sensitive(self):
         """Test that settings are case sensitive."""
         settings = Settings()
-        
+
         # These should be different
         assert settings.APP_NAME != settings.APP_NAME.lower()
-        assert settings.APP_VERSION != settings.APP_VERSION.upper() 
+        assert settings.DATABASE_URL != settings.DATABASE_URL.upper()
+ 

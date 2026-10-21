@@ -94,6 +94,36 @@ def start_all():
     return True
 
 
+def start_dev():
+    """Start in fast Developer Mode (SQLite DB, zero Docker, instant startup)."""
+    print_status("Starting SuperMon in Developer Mode (SQLite, No Docker required)...")
+    
+    # Check environment variables
+    check_env_file()
+    
+    # Initialize SQLite database schema and seed initial data
+    init_database()
+    
+    # Start all 6 MCP servers
+    start_mcp_servers()
+    
+    # Start backend
+    if not start_backend():
+        print_error("Failed to start backend")
+        return False
+        
+    # Start frontend
+    if not start_frontend():
+        print_error("Failed to start frontend")
+        return False
+        
+    print_status("Waiting for services to start...")
+    time.sleep(2)
+    show_status()
+    print_success("SuperMon Developer Mode started successfully!")
+    return True
+
+
 def setup_only():
     """Set up dependencies only without starting services."""
     print_status("Setting up SuperMon dependencies...")
@@ -145,7 +175,7 @@ def main():
     parser.add_argument(
         "command",
         choices=[
-            "start", "stop", "restart", "status",
+            "start", "dev", "stop", "restart", "status",
             "setup", "test", "format", "lint", "quality"
         ],
         nargs="?",
@@ -159,6 +189,8 @@ def main():
     # Execute command
     if args.command == "start":
         start_all()
+    elif args.command == "dev":
+        start_dev()
     elif args.command == "stop":
         stop_all_services()
     elif args.command == "restart":

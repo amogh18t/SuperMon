@@ -1,69 +1,93 @@
 """Database configuration and session management."""
 
 import logging
-from typing import Generator, Optional
+import os
 from contextlib import contextmanager
+from typing import Generator, Optional
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.exc import SQLAlchemyError
 import redis
 from redis.exceptions import RedisError
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# PostgreSQL Database Configuration
+ACTIVE_DB_URL = settings.DATABASE_URL
+
+
 def create_database_engine():
-    """Create database engine with proper configuration."""
-    try:
-        engine = create_engine(
-            settings.DATABASE_URL,
-            pool_pre_ping=True,
-            pool_recycle=300,
-            pool_size=10,
-            max_overflow=20,
-            echo=settings.DEBUG,
-            connect_args={
-                "connect_timeout": 10,
-                "application_name": "supermon"
-            }
-        )
-        
-        # Add event listeners for debugging
-        if settings.DEBUG:
-            @event.listens_for(engine, "connect")
-            def set_sqlite_pragma(dbapi_connection, connection_record):
-                """Set SQLite pragmas for better performance."""
-                if "sqlite" in settings.DATABASE_URL:
-                    cursor = dbapi_connection.cursor()
-                    cursor.execute("PRAGMA journal_mode=WAL")
-                    cursor.execute("PRAGMA synchronous=NORMAL")
-                    cursor.execute("PRAGMA cache_size=10000")
-                    cursor.execute("PRAGMA temp_store=MEMORY")
-                    cursor.close()
-        
-        return engine
-    except Exception as e:
-        logger.error(f"Failed to create database engine: {e}")
-        raise
+    """Create database engine with proper configuration, falling back to SQLite if PostgreSQL is unreachable."""
+    global ACTIVE_DB_URL
+    target_url = settings.DATABASE_URL
+
+    if "postgresql" in target_url:
+        try:
+            logger.info(
+                f"Attempting PostgreSQL connection: {target_url.split('@')[-1] if '@' in target_url else target_url}"
+            )
+            pg_engine = create_engine(
+                target_url,
+                pool_pre_ping=True,
+                pool_recycle=300,
+                pool_size=10,
+                max_overflow=20,
+                echo=settings.DEBUG,
+                connect_args={"connect_timeout": 2, "application_name": "supermon"},
+            )
+            # Test immediate connectivity
+            with pg_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            logger.info("✅ PostgreSQL connection successful")
+            ACTIVE_DB_URL = target_url
+            return pg_engine
+        except Exception as e:
+            logger.warning(
+                f"⚠️ PostgreSQL unavailable ({e}). Falling back to SQLite local database."
+            )
+            # Put database in <project_root>/data/supermon.db
+            backend_app_dir = os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__))
+            )
+            project_root = os.path.dirname(os.path.dirname(backend_app_dir))
+            data_dir = os.path.join(project_root, "data")
+            os.makedirs(data_dir, exist_ok=True)
+            sqlite_file = os.path.join(data_dir, "supermon.db")
+            sqlite_url = f"sqlite:///{sqlite_file}"
+            ACTIVE_DB_URL = sqlite_url
+            target_url = sqlite_url
+
+    # SQLite configuration
+    sqlite_engine = create_engine(
+        target_url, echo=settings.DEBUG, connect_args={"check_same_thread": False}
+    )
+
+    @event.listens_for(sqlite_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
+
+    ACTIVE_DB_URL = target_url
+    logger.info(f"✅ SQLite database initialized at {target_url}")
+    return sqlite_engine
 
 
 # Create engine and session factory
 try:
     engine = create_database_engine()
     SessionLocal = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=engine,
-        expire_on_commit=False
+        autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
     )
     Base = declarative_base()
 except Exception as e:
     logger.error(f"Database initialization failed: {e}")
     raise
+
 
 # Redis Configuration
 def create_redis_client():
@@ -75,9 +99,9 @@ def create_redis_client():
             socket_connect_timeout=5,
             socket_timeout=5,
             retry_on_timeout=True,
-            health_check_interval=30
+            health_check_interval=30,
         )
-        
+
         # Test connection
         client.ping()
         logger.info("Redis connection established")
@@ -154,7 +178,7 @@ def check_db_connection() -> bool:
     """Check if database connection is working."""
     try:
         with engine.connect() as connection:
-            connection.execute("SELECT 1")
+            connection.execute(text("SELECT 1"))
         return True
     except Exception as e:
         logger.error(f"Database connection check failed: {e}")
@@ -165,7 +189,7 @@ def check_redis_connection() -> bool:
     """Check if Redis connection is working."""
     if redis_client is None:
         return False
-    
+
     try:
         redis_client.ping()
         return True
@@ -176,18 +200,18 @@ def check_redis_connection() -> bool:
 
 def get_connection_info() -> dict:
     """Get database and Redis connection information."""
+    db_type = "postgresql" if "postgresql" in ACTIVE_DB_URL else "sqlite"
     return {
         "database": {
+            "type": db_type,
             "connected": check_db_connection(),
-            "url": settings.DATABASE_URL.replace(
-                settings.DATABASE_URL.split("@")[0].split(":")[-1],
-                "***"
-            ) if "@" in settings.DATABASE_URL else settings.DATABASE_URL
+            "url": ACTIVE_DB_URL.replace(
+                ACTIVE_DB_URL.split("@")[0].split(":")[-1], "***"
+            )
+            if "@" in ACTIVE_DB_URL
+            else ACTIVE_DB_URL,
         },
-        "redis": {
-            "connected": check_redis_connection(),
-            "url": settings.REDIS_URL
-        }
+        "redis": {"connected": check_redis_connection(), "url": settings.REDIS_URL},
     }
 
 
@@ -200,4 +224,4 @@ def close_connections() -> None:
             redis_client.close()
         logger.info("Database connections closed")
     except Exception as e:
-        logger.error(f"Error closing connections: {e}") 
+        logger.error(f"Error closing connections: {e}")
