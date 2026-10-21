@@ -1,9 +1,10 @@
 """Configuration settings for the SuperMon SDLC Automation Platform."""
 
-from typing import Optional, List
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator
 import os
+from typing import List, Optional
+
+from pydantic import Field, validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -17,11 +18,10 @@ class Settings(BaseSettings):
     # Database Settings
     DATABASE_URL: str = Field(
         default="postgresql://user:password@localhost/supermon",
-        description="PostgreSQL database connection string"
+        description="PostgreSQL database connection string",
     )
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis connection string"
+        default="redis://localhost:6379", description="Redis connection string"
     )
 
     # AI Services
@@ -31,23 +31,17 @@ class Settings(BaseSettings):
     GEMINI_ENDPOINT: Optional[str] = Field(
         default=None, description="Gemini API endpoint"
     )
-    OPENAI_API_KEY: Optional[str] = Field(
-        default=None, description="OpenAI API key"
-    )
+    OPENAI_API_KEY: Optional[str] = Field(default=None, description="OpenAI API key")
     ANTHROPIC_API_KEY: Optional[str] = Field(
         default=None, description="Anthropic API key"
     )
 
     # Communication Services
-    SLACK_BOT_TOKEN: Optional[str] = Field(
-        default=None, description="Slack bot token"
-    )
+    SLACK_BOT_TOKEN: Optional[str] = Field(default=None, description="Slack bot token")
     SLACK_SIGNING_SECRET: Optional[str] = Field(
         default=None, description="Slack signing secret"
     )
-    SLACK_APP_TOKEN: Optional[str] = Field(
-        default=None, description="Slack app token"
-    )
+    SLACK_APP_TOKEN: Optional[str] = Field(default=None, description="Slack app token")
     SLACK_CHANNEL_ID: Optional[str] = Field(
         default=None, description="Slack channel ID"
     )
@@ -62,9 +56,7 @@ class Settings(BaseSettings):
     WEBEX_ACCESS_TOKEN: Optional[str] = Field(
         default=None, description="Webex access token"
     )
-    WEBEX_BOT_TOKEN: Optional[str] = Field(
-        default=None, description="Webex bot token"
-    )
+    WEBEX_BOT_TOKEN: Optional[str] = Field(default=None, description="Webex bot token")
 
     # Email Settings
     SMTP_HOST: str = Field(default="smtp.gmail.com", description="SMTP host")
@@ -75,16 +67,20 @@ class Settings(BaseSettings):
     # Mail MCP Settings
     MAILTRAP_HOST: Optional[str] = Field(default=None, description="Mailtrap host")
     MAILTRAP_PORT: Optional[str] = Field(default=None, description="Mailtrap port")
-    MAILTRAP_USERNAME: Optional[str] = Field(default=None, description="Mailtrap username")
-    MAILTRAP_PASSWORD: Optional[str] = Field(default=None, description="Mailtrap password")
+    MAILTRAP_USERNAME: Optional[str] = Field(
+        default=None, description="Mailtrap username"
+    )
+    MAILTRAP_PASSWORD: Optional[str] = Field(
+        default=None, description="Mailtrap password"
+    )
     FROM_EMAIL: Optional[str] = Field(default=None, description="From email address")
     EMAIL_TO: Optional[str] = Field(default=None, description="To email address")
-    MAIL_MCP_ENDPOINT: Optional[str] = Field(default=None, description="Mail MCP endpoint")
+    MAIL_MCP_ENDPOINT: Optional[str] = Field(
+        default=None, description="Mail MCP endpoint"
+    )
 
     # Project Management
-    NOTION_API_KEY: Optional[str] = Field(
-        default=None, description="Notion API key"
-    )
+    NOTION_API_KEY: Optional[str] = Field(default=None, description="Notion API key")
     NOTION_DATABASE_ID: Optional[str] = Field(
         default=None, description="Notion database ID"
     )
@@ -131,7 +127,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = Field(
         default="your-secret-key-change-in-production",
-        description="Secret key for JWT tokens"
+        description="Secret key for JWT tokens",
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=30, description="Access token expiration time in minutes"
@@ -139,8 +135,12 @@ class Settings(BaseSettings):
 
     # CORS Settings
     ALLOWED_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
-        description="Allowed CORS origins"
+        default=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:3001",
+        ],
+        description="Allowed CORS origins",
     )
 
     # Agent Settings
@@ -165,7 +165,9 @@ class Settings(BaseSettings):
     def validate_database_url(cls, v: str) -> str:
         """Validate database URL format."""
         if not v.startswith(("postgresql://", "postgres://")):
-            raise ValueError("DATABASE_URL must start with postgresql:// or postgres://")
+            raise ValueError(
+                "DATABASE_URL must start with postgresql:// or postgres://"
+            )
         return v
 
     @validator("REDIS_URL")
@@ -192,30 +194,33 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-def validate_required_settings() -> List[str]:
+def validate_required_settings(current_settings: Optional[Settings] = None) -> List[str]:
     """Validate required settings and return list of missing ones."""
+    cfg = current_settings or Settings()
     required_settings = [
         "GEMINI_API_KEY",
         "SLACK_BOT_TOKEN",
         "NOTION_API_KEY",
-        "GITHUB_TOKEN"
+        "GITHUB_TOKEN",
     ]
-    
+
     missing_settings = []
     for setting in required_settings:
-        if not getattr(settings, setting):
+        if not getattr(cfg, setting):
             missing_settings.append(setting)
-    
+
     return missing_settings
 
 
-def check_settings() -> None:
+
+def check_settings(current_settings: Optional[Settings] = None) -> None:
     """Check and warn about missing required settings."""
-    missing = validate_required_settings()
+    missing = validate_required_settings(current_settings)
     if missing:
         print(f"⚠️  Warning: Missing required settings: {', '.join(missing)}")
         print("Please set these environment variables for full functionality.")
 
 
+
 # Validate on import
-check_settings() 
+check_settings()

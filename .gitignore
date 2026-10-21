@@ -449,11 +449,17 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# SuperMon specific
+# SuperMon specific runtime, logs, and database directories
+logs/
+.run/
+data/
+*.log
+*.pid
+*.db
 backend/logs/
 frontend/.next/
 frontend/out/
 mcp_servers/*/logs/
-*.pid
 uploads/
-backups/ 
+backups/
+ 

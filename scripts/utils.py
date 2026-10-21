@@ -77,36 +77,81 @@ def run_command(cmd: List[str], cwd: Optional[str] = None, use_conda: bool = Fal
         raise
 
 
-def run_background_process(cmd: List[str], cwd: Optional[str] = None, pid_file: Optional[str] = None, use_conda: bool = False) -> int:
-    """Run a command in the background and optionally save its PID to a file."""
+def get_logs_dir() -> str:
+    """Get the directory where logs are kept, creating it if needed."""
+    logs_dir = os.path.join(get_project_root(), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    return logs_dir
+
+
+def get_run_dir() -> str:
+    """Get the directory where runtime files (.pid) are kept, creating it if needed."""
+    run_dir = os.path.join(get_project_root(), ".run")
+    os.makedirs(run_dir, exist_ok=True)
+    return run_dir
+
+
+def get_data_dir() -> str:
+    """Get the directory where database and persistence files are kept, creating it if needed."""
+    data_dir = os.path.join(get_project_root(), "data")
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
+
+def run_background_process(
+    cmd: List[str],
+    cwd: Optional[str] = None,
+    pid_file: Optional[str] = None,
+    log_file: Optional[str] = None,
+    use_conda: bool = False
+) -> int:
+    """Run a command in the background and save its PID to .run/ and logs to logs/."""
     if use_conda:
         cmd = ["conda", "run", "-n", "supermon"] + cmd
+
+    # Resolve log destination
+    stdout_dest = subprocess.DEVNULL
+    stderr_dest = subprocess.DEVNULL
+
+    if log_file:
+        os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+        log_handle = open(log_file, 'a')
+        stdout_dest = log_handle
+        stderr_dest = subprocess.STDOUT
+    elif pid_file:
+        # Automatically route logs to logs/ directory based on service name
+        service_name = os.path.basename(pid_file).replace('.pid', '')
+        if "mcp" in service_name:
+            mcp_logs_dir = os.path.join(get_logs_dir(), "mcp")
+            os.makedirs(mcp_logs_dir, exist_ok=True)
+            log_path = os.path.join(mcp_logs_dir, f"{service_name}.log")
+        else:
+            log_path = os.path.join(get_logs_dir(), f"{service_name}.log")
+        log_handle = open(log_path, 'a')
+        stdout_dest = log_handle
+        stderr_dest = subprocess.STDOUT
+
     process = subprocess.Popen(
         cmd,
         cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        stdout=stdout_dest,
+        stderr=stderr_dest,
         preexec_fn=os.setsid
     )
 
     # Save PID to file if requested
     if pid_file:
         try:
+            os.makedirs(os.path.dirname(os.path.abspath(pid_file)), exist_ok=True)
             with open(pid_file, 'w') as f:
                 f.write(str(process.pid))
                 f.flush()
                 os.fsync(f.fileno())  # Ensure it's written to disk
-
-            # Verify the PID was written correctly
-            with open(pid_file, 'r') as f:
-                content = f.read().strip()
-                if not content:
-                    print_error(f"Failed to write PID to file: {pid_file}")
         except Exception as e:
             print_error(f"Error writing PID file: {e}")
 
     return process.pid
+
 
 
 def check_process_running(pid_file: str) -> bool:
@@ -194,11 +239,16 @@ def check_conda() -> bool:
 
 
 def check_docker() -> bool:
-    """Check if docker is available."""
+    """Check if docker CLI is available and docker daemon is running."""
     try:
-        run_command(["docker", "--version"])
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        res = subprocess.run(
+            ["docker", "info"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2
+        )
+        return res.returncode == 0
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 

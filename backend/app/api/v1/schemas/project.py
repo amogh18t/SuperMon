@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from app.models.project import ProjectStatus, Priority
+from pydantic import BaseModel, Field
+
+from app.models.project import Priority, ProjectStatus
+
 
 class ProjectCreate(BaseModel):
     name: str = Field(..., description="Project name")
@@ -11,9 +13,16 @@ class ProjectCreate(BaseModel):
     priority: Priority = Field(Priority.MEDIUM, description="Project priority")
     budget: Optional[int] = Field(None, description="Project budget in cents")
     team_size: Optional[int] = Field(None, description="Expected team size")
-    initialize_workflow: bool = Field(False, description="Whether to initialize SDLC workflow")
-    initial_conversations: Optional[List[Dict[str, Any]]] = Field(None, description="Initial conversations for requirements")
-    requirements: Optional[List[Dict[str, Any]]] = Field(None, description="Initial requirements")
+    initialize_workflow: bool = Field(
+        False, description="Whether to initialize SDLC workflow"
+    )
+    initial_conversations: Optional[List[Dict[str, Any]]] = Field(
+        None, description="Initial conversations for requirements"
+    )
+    requirements: Optional[List[Dict[str, Any]]] = Field(
+        None, description="Initial requirements"
+    )
+
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, description="Project name")
@@ -23,8 +32,13 @@ class ProjectUpdate(BaseModel):
     budget: Optional[int] = Field(None, description="Project budget in cents")
     team_size: Optional[int] = Field(None, description="Expected team size")
     end_date: Optional[datetime] = Field(None, description="Project end date")
-    requirements_summary: Optional[str] = Field(None, description="Requirements summary")
-    technical_specs: Optional[Dict[str, Any]] = Field(None, description="Technical specifications")
+    requirements_summary: Optional[str] = Field(
+        None, description="Requirements summary"
+    )
+    technical_specs: Optional[Dict[str, Any]] = Field(
+        None, description="Technical specifications"
+    )
+
 
 class ProjectResponse(BaseModel):
     id: int
@@ -47,13 +61,18 @@ class ProjectResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class ProjectWorkflowRequest(BaseModel):
-    workflow_data: Dict[str, Any] = Field(..., description="Workflow configuration data")
+    workflow_data: Dict[str, Any] = Field(
+        ..., description="Workflow configuration data"
+    )
+
 
 class ProjectWorkflowResponse(BaseModel):
     project_id: int
     workflow_results: Dict[str, Any]
     executed_at: str
+
 
 class EpicCreate(BaseModel):
     project_id: int = Field(..., description="Parent project ID")
@@ -63,6 +82,7 @@ class EpicCreate(BaseModel):
     estimated_hours: Optional[int] = Field(None, description="Estimated hours")
     due_date: Optional[datetime] = Field(None, description="Due date")
 
+
 class EpicUpdate(BaseModel):
     name: Optional[str] = Field(None, description="Epic name")
     description: Optional[str] = Field(None, description="Epic description")
@@ -70,6 +90,7 @@ class EpicUpdate(BaseModel):
     estimated_hours: Optional[int] = Field(None, description="Estimated hours")
     actual_hours: Optional[int] = Field(None, description="Actual hours")
     due_date: Optional[datetime] = Field(None, description="Due date")
+
 
 class EpicResponse(BaseModel):
     id: int
@@ -91,6 +112,7 @@ class EpicResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class UserStoryCreate(BaseModel):
     epic_id: int = Field(..., description="Parent epic ID")
     title: str = Field(..., description="User story title")
@@ -98,6 +120,7 @@ class UserStoryCreate(BaseModel):
     priority: Priority = Field(Priority.MEDIUM, description="User story priority")
     story_points: Optional[int] = Field(None, description="Story points")
     estimated_hours: Optional[int] = Field(None, description="Estimated hours")
+
 
 class UserStoryUpdate(BaseModel):
     title: Optional[str] = Field(None, description="User story title")
@@ -107,9 +130,12 @@ class UserStoryUpdate(BaseModel):
     story_points: Optional[int] = Field(None, description="Story points")
     estimated_hours: Optional[int] = Field(None, description="Estimated hours")
     actual_hours: Optional[int] = Field(None, description="Actual hours")
-    acceptance_criteria: Optional[Dict[str, Any]] = Field(None, description="Acceptance criteria")
+    acceptance_criteria: Optional[Dict[str, Any]] = Field(
+        None, description="Acceptance criteria"
+    )
     technical_notes: Optional[str] = Field(None, description="Technical notes")
     test_cases: Optional[Dict[str, Any]] = Field(None, description="Test cases")
+
 
 class UserStoryResponse(BaseModel):
     id: int
@@ -134,6 +160,7 @@ class UserStoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class MeetingCreate(BaseModel):
     project_id: int = Field(..., description="Project ID")
     title: str = Field(..., description="Meeting title")
@@ -142,6 +169,7 @@ class MeetingCreate(BaseModel):
     scheduled_at: datetime = Field(..., description="Scheduled time")
     duration_minutes: int = Field(60, description="Duration in minutes")
     participants: List[Dict[str, Any]] = Field([], description="Meeting participants")
+
 
 class MeetingUpdate(BaseModel):
     title: Optional[str] = Field(None, description="Meeting title")
@@ -152,6 +180,7 @@ class MeetingUpdate(BaseModel):
     summary: Optional[str] = Field(None, description="Meeting summary")
     action_items: Optional[Dict[str, Any]] = Field(None, description="Action items")
     decisions: Optional[Dict[str, Any]] = Field(None, description="Decisions made")
+
 
 class MeetingResponse(BaseModel):
     id: int
@@ -175,20 +204,29 @@ class MeetingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class StakeholderCreate(BaseModel):
     project_id: int = Field(..., description="Project ID")
     name: str = Field(..., description="Stakeholder name")
     email: Optional[str] = Field(None, description="Email address")
     role: str = Field(..., description="Stakeholder role")
-    preferred_channel: str = Field("slack", description="Preferred communication channel")
+    preferred_channel: str = Field(
+        "slack", description="Preferred communication channel"
+    )
     notification_frequency: str = Field("weekly", description="Notification frequency")
+
 
 class StakeholderUpdate(BaseModel):
     name: Optional[str] = Field(None, description="Stakeholder name")
     email: Optional[str] = Field(None, description="Email address")
     role: Optional[str] = Field(None, description="Stakeholder role")
-    preferred_channel: Optional[str] = Field(None, description="Preferred communication channel")
-    notification_frequency: Optional[str] = Field(None, description="Notification frequency")
+    preferred_channel: Optional[str] = Field(
+        None, description="Preferred communication channel"
+    )
+    notification_frequency: Optional[str] = Field(
+        None, description="Notification frequency"
+    )
+
 
 class StakeholderResponse(BaseModel):
     id: int
@@ -204,4 +242,4 @@ class StakeholderResponse(BaseModel):
     updated_at: datetime
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
